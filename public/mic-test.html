@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head><title>Mic Test</title></head>
+<body style="font-family:sans-serif; padding:40px; text-align:center;">
+  <h1>Microphone Test</h1>
+  <div id="status" style="font-size:24px; margin:20px; color:gray;">Click the button to test mic</div>
+  <button id="btn" onclick="testMic()" style="font-size:32px; padding:20px 40px; cursor:pointer;">🎤 Test Mic</button>
+  <br><br>
+  <div id="log" style="text-align:left; background:#f0f0f0; padding:20px; margin-top:20px; white-space:pre-wrap; font-family:monospace; font-size:14px;"></div>
+
+  <script>
+    const status = document.getElementById('status');
+    const log = document.getElementById('log');
+    const btn = document.getElementById('btn');
+
+    function addLog(msg) {
+      const time = new Date().toLocaleTimeString();
+      log.textContent += `[${time}] ${msg}\n`;
+      console.log(msg);
+    }
+
+    let recorder = null;
+    let stream = null;
+    let chunks = [];
+    let recording = false;
+
+    async function testMic() {
+      if (recording) {
+        // STOP
+        addLog('Stopping recording...');
+        if (recorder && recorder.state === 'recording') {
+          recorder.stop();
+        }
+        btn.textContent = '🎤 Test Mic';
+        recording = false;
+        return;
+      }
+
+      // START
+      addLog('Step 1: Requesting mic permission...');
+      status.textContent = 'Requesting mic...';
+      status.style.color = 'orange';
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        addLog('Step 2: Mic access GRANTED ✅');
+        addLog('  Tracks: ' + stream.getAudioTracks().map(t => t.label).join(', '));
+      } catch (err) {
+        addLog('Step 2: Mic FAILED ❌ - ' + err.name + ': ' + err.message);
+        status.textContent = 'MIC FAILED: ' + err.name;
+        status.style.color = 'red';
+        return;
+      }
+
+      // Check MediaRecorder support
+      addLog('Step 3: Checking MediaRecorder...');
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+
+      if (!mimeType) {
+        addLog('Step 3: MediaRecorder NOT supported ❌');
+        status.textContent = 'MediaRecorder not supported!';
+        status.style.color = 'red';
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+      addLog('Step 3: Using mimeType: ' + mimeType + ' ✅');
+
+      // Start recording
+      chunks = [];
+      try {
+        recorder = new MediaRecorder(stream, { mimeType });
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            chunks.push(e.data);
+            addLog('  Got chunk: ' + e.data.size + ' bytes');
+          }
+        };
+
+        recorder.onstart = () => {
+          addLog('Step 4: Recording STARTED ✅');
+          status.textContent = '🔴 RECORDING... Click button to stop';
+          status.style.color = 'red';
+        };
+
+        recorder.onstop = async () => {
+          addLog('Step 5: Recording STOPPED');
+          stream.getTracks().forEach(t => t.stop());
+          stream = null;
+
+          const blob = new Blob(chunks, { type: mimeType });
+          addLog('Step 5: Audio blob size: ' + blob.size + ' bytes');
+
+          if (blob.size < 1000) {
+            addLog('Step 5: Audio too small, nothing recorded ❌');
+            status.textContent = 'No audio captured!';
+            status.style.color = 'red';
+            return;
+          }
+
+          // Send to Whisper
+          status.textContent = 'Sending to Whisper...';
+          status.style.color = 'blue';
+          addLog('Step 6: Sending ' + blob.size + ' bytes to /api/transcribe...');
+
+          try {
+            const arrayBuf = await blob.arrayBuffer();
+            const res = await fetch('/api/transcribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/octet-stream' },
+              body: arrayBuf,
+            });
+            const data = await res.json();
+            addLog('Step 7: Whisper response: ' + JSON.stringify(data));
+
+            if (data.text) {
+              status.textContent = '✅ You said: "' + data.text + '"';
+              status.style.color = 'green';
+            } else {
+              status.textContent = '⚠️ Whisper returned empty text';
+              status.style.color = 'orange';
+            }
+          } catch (err) {
+            addLog('Step 7: Whisper FAILED ❌ - ' + err.message);
+            status.textContent = 'Whisper failed: ' + err.message;
+            status.style.color = 'red';
+          }
+        };
+
+        recorder.onerror = (e) => {
+          addLog('Recording ERROR ❌: ' + JSON.stringify(e));
+          status.textContent = 'Recording error!';
+          status.style.color = 'red';
+        };
+
+        recorder.start(500);
+        recording = true;
+        btn.textContent = '⏹ Stop Recording';
+      } catch (err) {
+        addLog('Step 4: MediaRecorder start FAILED ❌ - ' + err.message);
+        status.textContent = 'Recorder failed!';
+        status.style.color = 'red';
+        stream.getTracks().forEach(t => t.stop());
+      }
+    }
+  </script>
+</body>
+</html>

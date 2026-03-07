@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment variables (SECRETS - never commit!)
+.env
+
+# Build output
+dist/
+
+# Local data backups (now in Supabase)
+server/data/
+
+# Local uploaded images (now in Supabase Storage)
+server/uploads/
+
+# Claude Code
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
