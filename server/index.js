@@ -15,7 +15,12 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 const app = express();
 const PORT = process.env.PORT || 3001;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'usmania2024';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  console.error('ERROR: ADMIN_PASSWORD not found in .env');
+  process.exit(1);
+}
 const TOKEN_SECRET = crypto.randomBytes(32).toString('hex');
 
 if (!OPENAI_API_KEY) {
