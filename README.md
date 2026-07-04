@@ -3,7 +3,8 @@
 A modern restaurant web application with AI-powered interaction, designed to enhance customer experience through smart technology.
 
 ## 🌐 Live Demo
-👉 https://web-production-7052d.up.railway.app/
+👉 https://usmania-restaurant-nine.vercel.app
+
 
 ## 📂 GitHub Repository
 👉 https://github.com/ikram-al-balushi/usmania-restaurant
